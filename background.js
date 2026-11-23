@@ -1,19 +1,4 @@
-const DEFAULT_SETTINGS = {
-  enabled: true,
-  disabledHosts: [],
-  protectClipboard: true,
-  protectContextMenu: true,
-  protectFocus: true,
-  shortcuts: [
-    { id: "ctrl+c", ctrl: true, alt: false, shift: false, meta: false, code: "KeyC", label: "Ctrl + C", enabled: true },
-    { id: "ctrl+v", ctrl: true, alt: false, shift: false, meta: false, code: "KeyV", label: "Ctrl + V", enabled: true },
-    { id: "ctrl+x", ctrl: true, alt: false, shift: false, meta: false, code: "KeyX", label: "Ctrl + X", enabled: true },
-    { id: "ctrl+a", ctrl: true, alt: false, shift: false, meta: false, code: "KeyA", label: "Ctrl + A", enabled: true },
-    { id: "ctrl+f", ctrl: true, alt: false, shift: false, meta: false, code: "KeyF", label: "Ctrl + F", enabled: true },
-    { id: "ctrl+shift+i", ctrl: true, alt: false, shift: true, meta: false, code: "KeyI", label: "Ctrl + Shift + I", enabled: true },
-    { id: "f12", ctrl: false, alt: false, shift: false, meta: false, code: "F12", label: "F12", enabled: true }
-  ]
-};
+importScripts("shared.js");
 
 const MAX_LOG_ENTRIES = 30;
 const SESSION_KEY = "noctrl_tab_stats";
@@ -33,15 +18,8 @@ function getHostname(url) {
 }
 
 async function getSettings() {
-  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
-  return {
-    enabled: typeof stored.enabled === "boolean" ? stored.enabled : DEFAULT_SETTINGS.enabled,
-    disabledHosts: Array.isArray(stored.disabledHosts) ? stored.disabledHosts : DEFAULT_SETTINGS.disabledHosts,
-    protectClipboard: typeof stored.protectClipboard === "boolean" ? stored.protectClipboard : DEFAULT_SETTINGS.protectClipboard,
-    protectContextMenu: typeof stored.protectContextMenu === "boolean" ? stored.protectContextMenu : DEFAULT_SETTINGS.protectContextMenu,
-    protectFocus: typeof stored.protectFocus === "boolean" ? stored.protectFocus : DEFAULT_SETTINGS.protectFocus,
-    shortcuts: Array.isArray(stored.shortcuts) ? stored.shortcuts : DEFAULT_SETTINGS.shortcuts
-  };
+  const stored = await chrome.storage.local.get(NoCtrlShared.SETTING_KEYS);
+  return NoCtrlShared.normalizeSettings(stored);
 }
 
 async function ensureHydrated() {
@@ -97,7 +75,7 @@ async function updateBadgeForTab(tabId, tabUrl) {
   try {
     const settings = await getSettings();
     const host = getHostname(tabUrl);
-    const isDisabled = !settings.enabled || (host && settings.disabledHosts.includes(host));
+    const isDisabled = !settings.enabled || NoCtrlShared.isHostDisabled(host, settings.disabledHosts);
 
     if (isDisabled) {
       await chrome.action.setBadgeText({ tabId, text: "OFF" });
@@ -127,11 +105,12 @@ async function refreshAllTabBadges() {
 }
 
 async function ensureDefaultSettings() {
-  const existing = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  const existing = await chrome.storage.local.get(NoCtrlShared.SETTING_KEYS);
+  const defaults = NoCtrlShared.cloneDefaults();
   const toSet = {};
-  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+  for (const key of NoCtrlShared.SETTING_KEYS) {
     if (existing[key] === undefined) {
-      toSet[key] = value;
+      toSet[key] = defaults[key];
     }
   }
   if (Object.keys(toSet).length > 0) {
@@ -155,7 +134,7 @@ async function injectIntoExistingTabs() {
         try {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id, allFrames: true },
-            files: ["content.js"],
+            files: ["shared.js", "content.js"],
             injectImmediately: true
           });
         } catch {
@@ -174,13 +153,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   await refreshAllTabBadges();
 });
 
+// Content script підключається браузером сам, тому ін'єкція в наявні вкладки потрібна лише
+// після встановлення/оновлення (див. onInstalled), а не при кожному пробудженні service worker.
 chrome.runtime.onStartup.addListener(async () => {
   await ensureDefaultSettings();
-  await injectIntoExistingTabs();
   await refreshAllTabBadges();
 });
-
-injectIntoExistingTabs();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;

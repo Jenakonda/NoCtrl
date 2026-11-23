@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
   <title>NoCtrl</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
@@ -10,31 +11,27 @@
   <div class="app">
     <header class="header">
       <div class="brand">
-        <img src="icons/icon48.png" alt="NoCtrl" class="brand-icon" />
-        <div class="brand-text">
-          <div class="brand-title-row">
-            <h1 class="brand-title">NoCtrl</h1>
-            <span id="globalBadge" class="status-pill status-on">Активний</span>
-          </div>
-          <p class="brand-subtitle">Захист клавіш та буфера</p>
-        </div>
+        <img src="icons/icon48.png" alt="" class="brand-icon" />
+        <h1 class="brand-title">NoCtrl</h1>
+        <span id="globalBadge" class="status-pill status-on">Активний</span>
       </div>
-
       <div class="header-actions">
-        <button type="button" id="popoutBtn" class="btn-header-icon" title="Відкрити в окремій вкладці">↗</button>
+        <button type="button" id="popoutBtn" class="btn-header-icon" title="Відкрити в окремій вкладці" aria-label="Відкрити в окремій вкладці">↗</button>
         <label class="switch" title="Увімкнути або вимкнути захист глобально">
-          <input type="checkbox" id="globalToggle" />
+          <input type="checkbox" id="globalToggle" aria-label="Захист глобально" />
           <span class="slider"></span>
         </label>
       </div>
     </header>
 
-    <section class="site-bar" id="siteBar">
-      <div class="site-info">
+    <section class="hero" id="siteBar" data-state="on">
+      <div class="hero-status">
         <span class="site-dot" id="siteDot"></span>
-        <span class="site-host" id="siteHost" title="">Завантаження...</span>
+        <span id="siteStatus">Завантаження…</span>
       </div>
-      <button type="button" id="siteToggleBtn" class="btn-site">Увімкнено</button>
+      <p class="hero-host" id="siteHost" title="">…</p>
+      <button type="button" id="siteToggleBtn" class="btn-site">Пауза на сайті</button>
+      <p class="hero-hint" id="siteHint">Пауза діє на домен і всі його піддомени.</p>
     </section>
 
     <div id="fileNotice" class="notice hidden">
@@ -43,34 +40,8 @@
 
     <section class="card">
       <div class="section-header">
-        <h2 class="section-title">Додати комбінацію</h2>
-      </div>
-      <div class="recorder-row">
-        <textarea id="recorderTrap" class="recorder-trap" tabindex="-1" aria-hidden="true" autocomplete="off" spellcheck="false"></textarea>
-        <div id="recorderBtn" class="recorder-btn" tabindex="0" role="button">
-          Натисніть, щоб записати...
-        </div>
-        <button type="button" id="cancelRecordBtn" class="btn-icon hidden" title="Скасувати запис">✕</button>
-        <button type="button" id="addShortcutBtn" class="btn-primary" disabled>Додати</button>
-      </div>
-      <div class="manual-builder" id="manualBuilder">
-        <div class="mod-pills">
-          <button type="button" class="mod-pill" data-mod="ctrl">Ctrl</button>
-          <button type="button" class="mod-pill" data-mod="alt">Alt</button>
-          <button type="button" class="mod-pill" data-mod="shift">Shift</button>
-          <button type="button" class="mod-pill" data-mod="meta">Win</button>
-        </div>
-        <select id="manualKeySelect" class="key-select" title="Оберіть клавішу вручну">
-          <option value="">— Тільки модифікатор —</option>
-        </select>
-      </div>
-      <p id="recorderHint" class="hint">Натисніть кнопку вище для запису або оберіть модифікатори й клавішу вручну.</p>
-    </section>
-
-    <section class="card">
-      <div class="section-header">
         <div class="section-title-group">
-          <h2 class="section-title">Мої комбінації</h2>
+          <h2 class="section-title">Комбінації</h2>
           <span id="shortcutCount" class="count-pill">0</span>
         </div>
         <div class="section-actions">
@@ -79,10 +50,33 @@
         </div>
       </div>
 
-      <ul id="shortcutsList" class="shortcuts-list"></ul>
+      <ul id="shortcutsList" class="chips"></ul>
       <div id="shortcutsEmpty" class="empty-state hidden">
-        Список порожній. Запишіть комбінацію вище або натисніть «Стандартні».
+        Список порожній. Запишіть комбінацію нижче або натисніть «Стандартні».
       </div>
+
+      <div class="recorder-row">
+        <textarea id="recorderTrap" class="recorder-trap" tabindex="-1" aria-hidden="true" autocomplete="off" spellcheck="false"></textarea>
+        <div id="recorderBtn" class="recorder-btn" tabindex="0" role="button">Записати нову комбінацію</div>
+        <button type="button" id="cancelRecordBtn" class="btn-icon hidden" title="Скасувати запис" aria-label="Скасувати запис">✕</button>
+        <button type="button" id="addShortcutBtn" class="btn-primary" disabled>Додати</button>
+      </div>
+
+      <details class="manual">
+        <summary>Вибрати вручну</summary>
+        <div class="manual-builder" id="manualBuilder">
+          <div class="mod-pills">
+            <button type="button" class="mod-pill" data-mod="ctrl">Ctrl</button>
+            <button type="button" class="mod-pill" data-mod="alt">Alt</button>
+            <button type="button" class="mod-pill" data-mod="shift">Shift</button>
+            <button type="button" class="mod-pill" data-mod="meta">Win</button>
+          </div>
+          <select id="manualKeySelect" class="key-select" title="Оберіть клавішу вручну">
+            <option value="">— Тільки модифікатор —</option>
+          </select>
+        </div>
+      </details>
+      <p id="recorderHint" class="hint">Натисніть кнопку запису або виберіть модифікатори й клавішу вручну.</p>
     </section>
 
     <section class="card">
@@ -93,7 +87,7 @@
         <label class="toggle-row">
           <div class="toggle-meta">
             <span class="toggle-name">Буфер обміну</span>
-            <span class="toggle-desc">Блокувати перехоплення <code>copy</code>, <code>cut</code>, <code>paste</code></span>
+            <span class="toggle-desc"><code>copy</code>, <code>cut</code>, <code>paste</code></span>
           </div>
           <span class="switch switch-sm">
             <input type="checkbox" id="clipboardToggle" />
@@ -104,7 +98,7 @@
         <label class="toggle-row">
           <div class="toggle-meta">
             <span class="toggle-name">Контекстне меню</span>
-            <span class="toggle-desc">Блокувати перехоплення <code>contextmenu</code> (ПКМ)</span>
+            <span class="toggle-desc">Права кнопка миші, <code>contextmenu</code></span>
           </div>
           <span class="switch switch-sm">
             <input type="checkbox" id="contextMenuToggle" />
@@ -114,11 +108,22 @@
 
         <label class="toggle-row">
           <div class="toggle-meta">
-            <span class="toggle-name">Фокус та виділення</span>
-            <span class="toggle-desc">Блокувати <code>blur</code>, <code>visibilitychange</code>, <code>selectionchange</code>, <code>selectstart</code></span>
+            <span class="toggle-name">Фокус сторінки</span>
+            <span class="toggle-desc"><code>blur</code>, <code>focus</code>, <code>visibilitychange</code>, <code>mouseleave</code></span>
           </div>
           <span class="switch switch-sm">
             <input type="checkbox" id="focusToggle" />
+            <span class="slider"></span>
+          </span>
+        </label>
+
+        <label class="toggle-row">
+          <div class="toggle-meta">
+            <span class="toggle-name">Зміна виділення</span>
+            <span class="toggle-desc"><code>selectionchange</code>, може ламати редактори</span>
+          </div>
+          <span class="switch switch-sm">
+            <input type="checkbox" id="selectionToggle" />
             <span class="slider"></span>
           </span>
         </label>
@@ -135,12 +140,14 @@
       </div>
 
       <ul id="blockedLog" class="log-list"></ul>
+      <button type="button" id="logMoreBtn" class="btn-ghost btn-more hidden">Показати всі</button>
       <div id="logEmpty" class="empty-state">
         Спроб перехоплення на цій вкладці поки не зафіксовано.
       </div>
     </section>
   </div>
 
+  <script src="shared.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

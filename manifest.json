@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NoCtrl — Захист комбінацій клавіш",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Перехоплює обрані комбінації клавіш та події буфера обміну й зупиняє їх поширення до скриптів сторінки.",
   "permissions": [
     "storage",
@@ -34,6 +34,7 @@
         "<all_urls>"
       ],
       "js": [
+        "shared.js",
         "content.js"
       ],
       "run_at": "document_start",

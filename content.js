@@ -4,31 +4,12 @@
   if (window.__noctrlLoaded) return;
   window.__noctrlLoaded = true;
 
-  const DEFAULT_SETTINGS = {
-    enabled: true,
-    disabledHosts: [],
-    protectClipboard: true,
-    protectContextMenu: true,
-    protectFocus: true,
-    shortcuts: [
-      { id: "ctrl+c", ctrl: true, alt: false, shift: false, meta: false, code: "KeyC", label: "Ctrl + C", enabled: true },
-      { id: "ctrl+v", ctrl: true, alt: false, shift: false, meta: false, code: "KeyV", label: "Ctrl + V", enabled: true },
-      { id: "ctrl+x", ctrl: true, alt: false, shift: false, meta: false, code: "KeyX", label: "Ctrl + X", enabled: true },
-      { id: "ctrl+a", ctrl: true, alt: false, shift: false, meta: false, code: "KeyA", label: "Ctrl + A", enabled: true },
-      { id: "ctrl+f", ctrl: true, alt: false, shift: false, meta: false, code: "KeyF", label: "Ctrl + F", enabled: true },
-      { id: "ctrl+shift+i", ctrl: true, alt: false, shift: true, meta: false, code: "KeyI", label: "Ctrl + Shift + I", enabled: true },
-      { id: "f12", ctrl: false, alt: false, shift: false, meta: false, code: "F12", label: "F12", enabled: true }
-    ]
-  };
+  const Shared = globalThis.NoCtrlShared;
+  if (!Shared) return;
 
-  let settings = {
-    enabled: DEFAULT_SETTINGS.enabled,
-    disabledHosts: [...DEFAULT_SETTINGS.disabledHosts],
-    protectClipboard: DEFAULT_SETTINGS.protectClipboard,
-    protectContextMenu: DEFAULT_SETTINGS.protectContextMenu,
-    protectFocus: DEFAULT_SETTINGS.protectFocus,
-    shortcuts: [...DEFAULT_SETTINGS.shortcuts]
-  };
+  // До завантаження збережених налаштувань діють значення за замовчуванням (захист увімкнено):
+  // подія, що прийшла в перші мілісекунди життя сторінки, не має дійти до скриптів сайту.
+  const settings = Shared.cloneDefaults();
 
   window.__noctrlSettings = settings;
 
@@ -37,12 +18,7 @@
 
   function applyStoredSettings(stored) {
     if (!stored || typeof stored !== "object") return;
-    if (typeof stored.enabled === "boolean") settings.enabled = stored.enabled;
-    if (Array.isArray(stored.disabledHosts)) settings.disabledHosts = [...stored.disabledHosts];
-    if (typeof stored.protectClipboard === "boolean") settings.protectClipboard = stored.protectClipboard;
-    if (typeof stored.protectContextMenu === "boolean") settings.protectContextMenu = stored.protectContextMenu;
-    if (typeof stored.protectFocus === "boolean") settings.protectFocus = stored.protectFocus;
-    if (Array.isArray(stored.shortcuts)) settings.shortcuts = [...stored.shortcuts];
+    Object.assign(settings, Shared.normalizeSettings({ ...settings, ...stored }));
   }
 
   try {
@@ -57,7 +33,7 @@
 
   function loadSettings() {
     try {
-      chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS), (result) => {
+      chrome.storage.local.get(Shared.SETTING_KEYS, (result) => {
         if (chrome.runtime.lastError) return;
         applyStoredSettings(result);
       });
@@ -69,22 +45,11 @@
   try {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
-      if (changes.enabled) settings.enabled = Boolean(changes.enabled.newValue);
-      if (changes.disabledHosts && Array.isArray(changes.disabledHosts.newValue)) {
-        settings.disabledHosts = changes.disabledHosts.newValue;
+      const patch = {};
+      for (const key of Shared.SETTING_KEYS) {
+        if (changes[key] && changes[key].newValue !== undefined) patch[key] = changes[key].newValue;
       }
-      if (changes.protectClipboard) {
-        settings.protectClipboard = Boolean(changes.protectClipboard.newValue);
-      }
-      if (changes.protectContextMenu) {
-        settings.protectContextMenu = Boolean(changes.protectContextMenu.newValue);
-      }
-      if (changes.protectFocus) {
-        settings.protectFocus = Boolean(changes.protectFocus.newValue);
-      }
-      if (changes.shortcuts && Array.isArray(changes.shortcuts.newValue)) {
-        settings.shortcuts = changes.shortcuts.newValue;
-      }
+      applyStoredSettings(patch);
     });
   } catch {
     // Ignore if storage API is unavailable
@@ -113,9 +78,7 @@
 
   function isActiveForCurrentHost() {
     if (!settings.enabled) return false;
-    const host = getCurrentHost();
-    if (host && settings.disabledHosts.includes(host)) return false;
-    return true;
+    return !Shared.isHostDisabled(getCurrentHost(), settings.disabledHosts);
   }
 
   function notifyBlocked(label, eventType) {
@@ -329,10 +292,21 @@
   function handleSelectionChange(event) {
     if (event.isTrusted === false || !isActiveForCurrentHost()) return;
 
-    if (settings.protectFocus || activeBlockedCodes.size > 0 || Date.now() - lastBlockedKeyTime < 200) {
+    if (settings.protectSelection || activeBlockedCodes.size > 0 || Date.now() - lastBlockedKeyTime < 200) {
       event.stopImmediatePropagation();
       event.stopPropagation();
     }
+  }
+
+  /**
+   * Подія стосується сторінки/вікна загалом, а не окремого елемента.
+   * Фокус, blur і mouseenter/mouseleave окремих елементів потрібні самим сайтам
+   * (поля вводу, редактори, hover-меню), тому їх не чіпаємо.
+   */
+  function isPageLevelTarget(target) {
+    if (!target) return true;
+    if (target === window || target === document) return true;
+    return target === document.documentElement || target === document.body;
   }
 
   function handleFocusLoss(event) {
@@ -341,6 +315,7 @@
     }
 
     if (event.isTrusted === false || !isActiveForCurrentHost() || !settings.protectFocus) return;
+    if (!isPageLevelTarget(event.target)) return;
 
     event.stopImmediatePropagation();
     event.stopPropagation();

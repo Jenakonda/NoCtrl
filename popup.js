@@ -1,22 +1,8 @@
 (function () {
   "use strict";
 
-  const DEFAULT_SETTINGS = {
-    enabled: true,
-    disabledHosts: [],
-    protectClipboard: true,
-    protectContextMenu: true,
-    protectFocus: true,
-    shortcuts: [
-      { id: "ctrl+c", ctrl: true, alt: false, shift: false, meta: false, code: "KeyC", label: "Ctrl + C", enabled: true },
-      { id: "ctrl+v", ctrl: true, alt: false, shift: false, meta: false, code: "KeyV", label: "Ctrl + V", enabled: true },
-      { id: "ctrl+x", ctrl: true, alt: false, shift: false, meta: false, code: "KeyX", label: "Ctrl + X", enabled: true },
-      { id: "ctrl+a", ctrl: true, alt: false, shift: false, meta: false, code: "KeyA", label: "Ctrl + A", enabled: true },
-      { id: "ctrl+f", ctrl: true, alt: false, shift: false, meta: false, code: "KeyF", label: "Ctrl + F", enabled: true },
-      { id: "ctrl+shift+i", ctrl: true, alt: false, shift: true, meta: false, code: "KeyI", label: "Ctrl + Shift + I", enabled: true },
-      { id: "f12", ctrl: false, alt: false, shift: false, meta: false, code: "F12", label: "F12", enabled: true }
-    ]
-  };
+  const Shared = window.NoCtrlShared;
+  const DEFAULT_SETTINGS = Shared.DEFAULT_SETTINGS;
 
   const MODIFIER_CODES = new Set([
     "ControlLeft",
@@ -66,6 +52,10 @@
   const els = {
     globalToggle: document.getElementById("globalToggle"),
     globalBadge: document.getElementById("globalBadge"),
+    siteBar: document.getElementById("siteBar"),
+    siteStatus: document.getElementById("siteStatus"),
+    siteHint: document.getElementById("siteHint"),
+    logMoreBtn: document.getElementById("logMoreBtn"),
     siteDot: document.getElementById("siteDot"),
     siteHost: document.getElementById("siteHost"),
     siteToggleBtn: document.getElementById("siteToggleBtn"),
@@ -86,6 +76,7 @@
     clipboardToggle: document.getElementById("clipboardToggle"),
     contextMenuToggle: document.getElementById("contextMenuToggle"),
     focusToggle: document.getElementById("focusToggle"),
+    selectionToggle: document.getElementById("selectionToggle"),
     blockedCount: document.getElementById("blockedCount"),
     clearLogBtn: document.getElementById("clearLogBtn"),
     blockedLog: document.getElementById("blockedLog"),
@@ -94,7 +85,7 @@
 
   const modPills = Array.from(document.querySelectorAll(".mod-pill"));
 
-  let settings = structuredClone(DEFAULT_SETTINGS);
+  let settings = Shared.cloneDefaults();
   let currentTabId = null;
   let currentHost = "";
   let currentProtocol = "";
@@ -294,8 +285,8 @@
       els.addShortcutBtn.disabled = true;
       if (!keepRecording) {
         els.recorderBtn.className = "recorder-btn";
-        els.recorderBtn.textContent = "Натисніть, щоб записати...";
-        setHint("Натисніть кнопку вище для запису або оберіть модифікатори й клавішу вручну.");
+        els.recorderBtn.textContent = "Записати нову комбінацію";
+        setHint("Натисніть кнопку запису або виберіть модифікатори й клавішу вручну.");
       }
       return;
     }
@@ -353,9 +344,9 @@
     }
     if (resetText && !pendingShortcut) {
       els.recorderBtn.className = "recorder-btn";
-      els.recorderBtn.textContent = "Натисніть, щоб записати...";
+      els.recorderBtn.textContent = "Записати нову комбінацію";
       els.addShortcutBtn.disabled = true;
-      setHint("Натисніть кнопку вище для запису або оберіть модифікатори й клавішу вручну.");
+      setHint("Натисніть кнопку запису або виберіть модифікатори й клавішу вручну.");
     }
   }
 
@@ -371,49 +362,65 @@
     els.globalBadge.className = "status-pill " + (on ? "status-on" : "status-off");
   }
 
+  function setSiteState(state, { status, host, hostTitle, button, buttonDisabled, hint }) {
+    els.siteBar.dataset.state = state;
+    els.siteDot.className = "site-dot " + state;
+    els.siteStatus.textContent = status;
+    els.siteHost.textContent = host;
+    els.siteHost.title = hostTitle || host;
+    els.siteToggleBtn.textContent = button;
+    els.siteToggleBtn.disabled = buttonDisabled;
+    els.siteHint.textContent = hint || "";
+    els.siteHint.classList.toggle("hidden", !hint);
+  }
+
   function renderSiteBar() {
     els.fileNotice.classList.add("hidden");
 
     if (currentProtocol === "file:") {
-      els.siteHost.textContent = "Локальний файл (file://)";
-      els.siteHost.title = "Локальний файл";
-      els.siteDot.className = "site-dot" + (settings.enabled ? "" : " paused");
-      els.siteToggleBtn.disabled = true;
-      els.siteToggleBtn.className = "btn-site";
-      els.siteToggleBtn.textContent = "Локально";
+      setSiteState(settings.enabled ? "on" : "off", {
+        status: settings.enabled ? "Захищено" : "Вимкнено глобально",
+        host: "Локальний файл (file://)",
+        button: "Недоступно для файлів",
+        buttonDisabled: true
+      });
       els.fileNotice.classList.remove("hidden");
       return;
     }
 
     if (!currentHost || (currentProtocol !== "http:" && currentProtocol !== "https:")) {
-      els.siteHost.textContent = "Системна сторінка браузера";
-      els.siteHost.title = "Браузер обмежує скрипти на системних сторінках";
-      els.siteDot.className = "site-dot unavailable";
-      els.siteToggleBtn.disabled = true;
-      els.siteToggleBtn.className = "btn-site";
-      els.siteToggleBtn.textContent = "Недоступно";
+      setSiteState("unavailable", {
+        status: "Недоступно",
+        host: "Системна сторінка браузера",
+        hostTitle: "Браузер обмежує скрипти на системних сторінках",
+        button: "Недоступно",
+        buttonDisabled: true
+      });
       return;
     }
 
-    els.siteHost.textContent = currentHost;
-    els.siteHost.title = currentHost;
-
-    const isHostDisabled = settings.disabledHosts.includes(currentHost);
-    const activeHere = settings.enabled && !isHostDisabled;
-
-    els.siteToggleBtn.disabled = !settings.enabled;
     if (!settings.enabled) {
-      els.siteDot.className = "site-dot paused";
-      els.siteToggleBtn.className = "btn-site paused";
-      els.siteToggleBtn.textContent = "Глобально вимк.";
-    } else if (activeHere) {
-      els.siteDot.className = "site-dot";
-      els.siteToggleBtn.className = "btn-site";
-      els.siteToggleBtn.textContent = "Увімк. на сайті";
+      setSiteState("off", {
+        status: "Вимкнено глобально",
+        host: currentHost,
+        button: "Увімкніть захист угорі",
+        buttonDisabled: true
+      });
+    } else if (Shared.isHostDisabled(currentHost, settings.disabledHosts)) {
+      setSiteState("paused", {
+        status: "На паузі на",
+        host: currentHost,
+        button: "Увімкнути на сайті",
+        buttonDisabled: false,
+        hint: "Пауза діє на домен і всі його піддомени."
+      });
     } else {
-      els.siteDot.className = "site-dot paused";
-      els.siteToggleBtn.className = "btn-site paused";
-      els.siteToggleBtn.textContent = "Вимк. на сайті";
+      setSiteState("on", {
+        status: "Захищено на",
+        host: currentHost,
+        button: "Пауза на сайті",
+        buttonDisabled: false
+      });
     }
   }
 
@@ -432,52 +439,31 @@
     els.shortcutsEmpty.classList.add("hidden");
 
     for (const shortcut of list) {
+      const enabled = shortcut.enabled !== false;
+      const text = String(shortcut.label || shortcut.code || "");
+
       const li = document.createElement("li");
-      li.className = "shortcut-item" + (shortcut.enabled === false ? " disabled" : "");
+      li.className = "chip" + (enabled ? "" : " off");
 
-      const keycaps = document.createElement("div");
-      keycaps.className = "keycaps";
-      const parts = String(shortcut.label || shortcut.code || "").split(" + ");
-      parts.forEach((part, idx) => {
-        if (idx > 0) {
-          const plus = document.createElement("span");
-          plus.className = "keycap-plus";
-          plus.textContent = "+";
-          keycaps.appendChild(plus);
-        }
-        const kbd = document.createElement("kbd");
-        kbd.className = "keycap";
-        kbd.textContent = part;
-        keycaps.appendChild(kbd);
-      });
-
-      const controls = document.createElement("div");
-      controls.className = "shortcut-controls";
-
-      const switchLabel = document.createElement("label");
-      switchLabel.className = "switch switch-sm";
-      switchLabel.title = shortcut.enabled === false ? "Увімкнути комбінацію" : "Вимкнути комбінацію";
-
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = shortcut.enabled !== false;
-      checkbox.addEventListener("change", async () => {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "chip-label";
+      toggleBtn.textContent = text;
+      toggleBtn.setAttribute("aria-pressed", String(enabled));
+      toggleBtn.title = enabled ? "Клацніть, щоб вимкнути комбінацію" : "Клацніть, щоб увімкнути комбінацію";
+      toggleBtn.addEventListener("click", async () => {
         const updated = settings.shortcuts.map((s) =>
-          s.id === shortcut.id ? { ...s, enabled: checkbox.checked } : s
+          s.id === shortcut.id ? { ...s, enabled: !enabled } : s
         );
         await saveSettings({ shortcuts: updated });
         renderShortcuts();
       });
 
-      const slider = document.createElement("span");
-      slider.className = "slider";
-      switchLabel.appendChild(checkbox);
-      switchLabel.appendChild(slider);
-
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
-      deleteBtn.className = "btn-delete";
+      deleteBtn.className = "chip-x";
       deleteBtn.title = "Видалити";
+      deleteBtn.setAttribute("aria-label", `Видалити ${text}`);
       deleteBtn.textContent = "×";
       deleteBtn.addEventListener("click", async () => {
         const updated = settings.shortcuts.filter((s) => s.id !== shortcut.id);
@@ -485,11 +471,8 @@
         renderShortcuts();
       });
 
-      controls.appendChild(switchLabel);
-      controls.appendChild(deleteBtn);
-
-      li.appendChild(keycaps);
-      li.appendChild(controls);
+      li.appendChild(toggleBtn);
+      li.appendChild(deleteBtn);
       els.shortcutsList.appendChild(li);
     }
   }
@@ -498,6 +481,7 @@
     els.clipboardToggle.checked = Boolean(settings.protectClipboard);
     els.contextMenuToggle.checked = Boolean(settings.protectContextMenu);
     els.focusToggle.checked = Boolean(settings.protectFocus);
+    els.selectionToggle.checked = Boolean(settings.protectSelection);
   }
 
   function formatTime(ts) {
@@ -512,15 +496,21 @@
     }
   }
 
+  const LOG_PREVIEW_COUNT = 3;
+  let logExpanded = false;
+  let lastStats = { count: 0, log: [] };
+
   function renderStats(stats) {
-    const count = stats?.count || 0;
-    const log = Array.isArray(stats?.log) ? stats.log : [];
+    lastStats = stats || { count: 0, log: [] };
+    const count = lastStats.count || 0;
+    const log = Array.isArray(lastStats.log) ? lastStats.log : [];
 
     els.blockedCount.textContent = String(count);
     els.blockedLog.textContent = "";
 
     if (log.length === 0) {
       els.blockedLog.classList.add("hidden");
+      els.logMoreBtn.classList.add("hidden");
       els.logEmpty.classList.remove("hidden");
       return;
     }
@@ -528,7 +518,8 @@
     els.blockedLog.classList.remove("hidden");
     els.logEmpty.classList.add("hidden");
 
-    for (const entry of log) {
+    const visible = logExpanded ? log : log.slice(0, LOG_PREVIEW_COUNT);
+    for (const entry of visible) {
       const li = document.createElement("li");
       li.className = "log-item";
 
@@ -554,6 +545,10 @@
       li.appendChild(time);
       els.blockedLog.appendChild(li);
     }
+
+    const hasMore = log.length > LOG_PREVIEW_COUNT;
+    els.logMoreBtn.classList.toggle("hidden", !hasMore);
+    els.logMoreBtn.textContent = logExpanded ? "Згорнути" : `Показати всі (${log.length})`;
   }
 
   async function refreshTabStats() {
@@ -588,20 +583,13 @@
     }
 
     const [stored, tabs] = await Promise.all([
-      chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS)),
+      chrome.storage.local.get(Shared.SETTING_KEYS),
       currentSelfTab
         ? chrome.tabs.query({ currentWindow: true })
         : chrome.tabs.query({ active: true, currentWindow: true })
     ]);
 
-    settings = {
-      enabled: typeof stored.enabled === "boolean" ? stored.enabled : DEFAULT_SETTINGS.enabled,
-      disabledHosts: Array.isArray(stored.disabledHosts) ? stored.disabledHosts : [...DEFAULT_SETTINGS.disabledHosts],
-      protectClipboard: typeof stored.protectClipboard === "boolean" ? stored.protectClipboard : DEFAULT_SETTINGS.protectClipboard,
-      protectContextMenu: typeof stored.protectContextMenu === "boolean" ? stored.protectContextMenu : DEFAULT_SETTINGS.protectContextMenu,
-      protectFocus: typeof stored.protectFocus === "boolean" ? stored.protectFocus : DEFAULT_SETTINGS.protectFocus,
-      shortcuts: Array.isArray(stored.shortcuts) ? stored.shortcuts : structuredClone(DEFAULT_SETTINGS.shortcuts)
-    };
+    settings = Shared.normalizeSettings(stored);
 
     const targetTab = currentSelfTab
       ? tabs
@@ -658,10 +646,10 @@
 
   els.siteToggleBtn.addEventListener("click", async () => {
     if (!currentHost) return;
-    const exists = settings.disabledHosts.includes(currentHost);
-    const updated = exists
-      ? settings.disabledHosts.filter((h) => h !== currentHost)
-      : [...settings.disabledHosts, currentHost];
+    // Вимкнення для example.com діє й на www.example.com, тому «увімкнути» прибирає всі покриваючі записи.
+    const updated = Shared.isHostDisabled(currentHost, settings.disabledHosts)
+      ? Shared.removeHost(settings.disabledHosts, currentHost)
+      : Shared.addHost(settings.disabledHosts, currentHost);
     await saveSettings({ disabledHosts: updated });
     renderSiteBar();
   });
@@ -839,7 +827,7 @@
 
     syncManualBuilderFromShortcut(null);
     els.recorderBtn.className = "recorder-btn";
-    els.recorderBtn.textContent = "Натисніть, щоб записати...";
+    els.recorderBtn.textContent = "Записати нову комбінацію";
     els.addShortcutBtn.disabled = true;
 
     await saveSettings({ shortcuts: updated });
@@ -870,6 +858,15 @@
 
   els.focusToggle.addEventListener("change", async () => {
     await saveSettings({ protectFocus: els.focusToggle.checked });
+  });
+
+  els.selectionToggle.addEventListener("change", async () => {
+    await saveSettings({ protectSelection: els.selectionToggle.checked });
+  });
+
+  els.logMoreBtn.addEventListener("click", () => {
+    logExpanded = !logExpanded;
+    renderStats(lastStats);
   });
 
   els.clearLogBtn.addEventListener("click", async () => {
