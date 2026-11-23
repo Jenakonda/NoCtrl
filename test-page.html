@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoCtrl — Ворожий тестовий стенд (Анти-детект + 8 пасток)</title>
+  <style id="noctrl-test-style">
+    :root {
+      color-scheme: dark;
+      --bg: #070b14;
+      --surface: #111827;
+      --surface-2: #0f172a;
+      --border: #243047;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --ok: #10b981;
+      --ok-soft: rgba(16, 185, 129, 0.14);
+      --bad: #ef4444;
+      --bad-soft: rgba(239, 68, 68, 0.15);
+      --warn: #f59e0b;
+      --warn-soft: rgba(245, 158, 11, 0.14);
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 18px 48px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+    .header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 21px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+    p {
+      margin: 0 0 8px;
+      color: var(--muted);
+    }
+    code {
+      background: rgba(148, 163, 184, 0.14);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #7dd3fc;
+    }
+    .note {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--warn-soft);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fcd34d;
+      font-size: 13px;
+    }
+    .btn {
+      padding: 7px 13px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: #1e293b;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+      transition: background 0.15s ease;
+    }
+    .btn:hover { background: #334155; }
+    .btn-primary {
+      background: var(--cyan);
+      color: #042f2e;
+      border-color: transparent;
+    }
+    .btn-primary:hover { background: #22d3ee; }
+
+    /* Module 1: Anti-Detect grid */
+    .detect-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .detect-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .detect-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .detect-title {
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .pill-ok {
+      background: var(--ok-soft);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .pill-bad {
+      background: var(--bad-soft);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .detect-detail {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Module 2: 8 traps counters */
+    .traps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .trap-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .trap-card.breached {
+      border-color: rgba(239, 68, 68, 0.6);
+      background: rgba(239, 68, 68, 0.07);
+    }
+    .trap-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .trap-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .trap-count {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--ok-soft);
+      color: #34d399;
+    }
+    .trap-card.breached .trap-count {
+      background: var(--bad-soft);
+      color: #f87171;
+    }
+    .trap-desc {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    /* Test Zone */
+    .zones-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    @media (max-width: 720px) {
+      .zones-grid { grid-template-columns: 1fr; }
+    }
+    label.zone-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    textarea, .editable-box {
+      width: 100%;
+      min-height: 92px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13.5px;
+      resize: vertical;
+      outline: none;
+    }
+    textarea:focus, .editable-box:focus {
+      border-color: var(--cyan);
+    }
+    .selectable-box {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px dashed #3b4b6b;
+      background: var(--surface-2);
+      font-size: 13px;
+      color: #e2e8f0;
+      margin-top: 10px;
+    }
+
+    /* Embedded iframe trap */
+    .iframe-wrap {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      overflow: hidden;
+      background: var(--surface-2);
+    }
+    .iframe-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #172136;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+    iframe {
+      width: 100%;
+      height: 145px;
+      border: none;
+      display: block;
+      background: #0b1120;
+    }
+
+    /* Live Log */
+    .log-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .filter-pill {
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-pill.active {
+      background: rgba(6, 182, 212, 0.16);
+      color: #67e8f9;
+      border-color: rgba(6, 182, 212, 0.5);
+    }
+    #snooperLog {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #snooperLog li {
+      padding: 7px 10px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      border: 1px solid #1e293b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge {
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--bad-soft);
+      color: #fca5a5;
+      flex-shrink: 0;
+    }
+    .empty-log {
+      padding: 14px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header-row">
+        <div>
+          <h1>Ворожий тестовий стенд для NoCtrl</h1>
+          <p>
+            Сторінка імітує сайт із захистом від розширень: сканує DOM/прототипи, запускає синтетичні пастки <code>dispatchEvent</code>
+            та розставляє 8 каналів шпигунства за клавішами, буфером обміну, виділенням і фокусом.
+          </p>
+        </div>
+        <button type="button" id="resetAllBtn" class="btn">Скинути все</button>
+      </div>
+      <div class="note">
+        Якщо ви відкрили сторінку як <code>file:///...</code>, увімкніть <strong>«Дозволити доступ до URL-адрес файлів»</strong>
+        у налаштуваннях розширення (<code>chrome://extensions</code> → Деталі).
+      </div>
+    </div>
+
+    <!-- Module 1: Anti-Extension Detector -->
+    <div class="card">
+      <div class="header-row">
+        <div>
+          <h2>Модуль 1. Сканер виявлення розширень (Anti-Extension Detector)</h2>
+          <p>Перевіряє, чи залишається NoCtrl невидимим для скриптів сторінки.</p>
+        </div>
+        <button type="button" id="runDetectBtn" class="btn btn-primary">Запустити перевірку</button>
+      </div>
+      <div class="detect-grid" id="detectGrid"></div>
+    </div>
+
+    <!-- Module 2: Interactive Zone + 8 Traps -->
+    <div class="card">
+      <h2>Модуль 2. Полігон для тестування (спробуйте заблоковані комбінації)</h2>
+      <p>
+        Натискайте <code>Ctrl+C</code>, <code>Ctrl+V</code>, <code>Ctrl+X</code>, <code>Ctrl+A</code>, <code>Ctrl+F</code>,
+        <code>Ctrl+M</code>, <code>Ctrl+Enter</code>, <code>F12</code>, виділяйте текст або тисніть ПКМ.
+        Коли NoCtrl працює, лічильники нижче мають залишатися на <code>0</code>, а нативні дії браузера — працювати.
+      </p>
+
+      <div class="zones-grid">
+        <div>
+          <label class="zone-label" for="testInput">Поле &lt;textarea&gt; (тест Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Enter)</label>
+          <textarea id="testInput">Виділіть цей текст та спробуйте Ctrl+C, Ctrl+V, Ctrl+X або Ctrl+A. Спробуйте також клікнути правою кнопкою миші.</textarea>
+        </div>
+        <div>
+          <label class="zone-label" for="editableBox">Поле [contenteditable] (тест beforeinput / input)</label>
+          <div id="editableBox" class="editable-box" contenteditable="true">Редагований блок для перевірки вставки (Ctrl+V), вирізання (Ctrl+X) та Ctrl+Enter без витоку через InputEvent.</div>
+        </div>
+      </div>
+
+      <div id="selectableText" class="selectable-box">
+        <strong>Захищений текст (пастка selectstart):</strong> Спробуйте виділити цей абзац мишею. Без NoCtrl скрипт сторінки
+        викликає <code>e.preventDefault()</code> на <code>selectstart</code> та блокує виділення. Із NoCtrl текст виділяється вільно.
+      </div>
+
+      <div id="radioTestBox" class="selectable-box" style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <strong>Тест кліків по перемикачах (focus / focusin):</strong>
+        <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <input type="radio" name="demoRadio" id="radioA" value="A" /> Варіант А
+        </label>
+        <label style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <input type="radio" name="demoRadio" id="radioB" value="B" /> Варіант Б
+        </label>
+      </div>
+
+      <div class="iframe-wrap">
+        <div class="iframe-bar">
+          <span><strong>Пастка 8:</strong> Вбудований <code>&lt;iframe srcdoc&gt;</code> (імітація пісочниці в чаті Gemini)</span>
+          <button type="button" id="respawnIframeBtn" class="btn">Перестворити динамічний iframe</button>
+        </div>
+        <div id="iframeHost"></div>
+      </div>
+
+      <div class="traps-grid" id="trapsGrid"></div>
+    </div>
+
+    <!-- Live Snooper Log -->
+    <div class="card">
+      <div class="log-controls">
+        <div>
+          <strong>Журнал перехоплень сайту (<span id="totalLeaks">0</span>):</strong>
+        </div>
+        <div class="filter-pills" id="filterPills">
+          <button type="button" class="filter-pill active" data-filter="all">Усі</button>
+          <button type="button" class="filter-pill" data-filter="keys">Клавіші</button>
+          <button type="button" class="filter-pill" data-filter="clipboard">Буфер/Input</button>
+          <button type="button" class="filter-pill" data-filter="selection">Виділення/ПКМ</button>
+          <button type="button" class="filter-pill" data-filter="focus">Фокус</button>
+          <button type="button" class="filter-pill" data-filter="iframe">Iframe</button>
+        </div>
+        <button type="button" id="clearLogBtn" class="btn">Очистити лог</button>
+      </div>
+      <ul id="snooperLog"></ul>
+      <div id="emptyLog" class="empty-log">
+        Сайт поки не зафіксував жодної захищеної дії.
+      </div>
+    </div>
+  </div>
+
+  <script id="noctrl-test-script">
+    (function () {
+      "use strict";
+
+      const TRAPS = [
+        { id: "keys", name: "1. Клавіші", desc: "keydown, keypress, keyup (capture)" },
+        { id: "clipboard", name: "2. Буфер обміну", desc: "copy, cut, paste + preventDefault()" },
+        { id: "beforeinput", name: "3. InputEvent", desc: "beforeinput та input (inputType)" },
+        { id: "selectstart", name: "4. SelectStart", desc: "selectstart + preventDefault()" },
+        { id: "rmb", name: "5. ПКМ / Меню", desc: "contextmenu + mousedown/mouseup/auxclick (button=2)" },
+        { id: "selectionchange", name: "6. SelectionChange", desc: "selectionchange (виявлення Ctrl+A)" },
+        { id: "focus", name: "7. Фокус / Видимість", desc: "blur, focusout, focus, focusin, visibilitychange, mouseleave, mouseenter" },
+        { id: "iframe", name: "8. Iframe srcdoc", desc: "вкладена пісочниця з власними слухачами" }
+      ];
+
+      const trapCounts = Object.fromEntries(TRAPS.map((t) => [t.id, 0]));
+      const logEntries = [];
+      let activeFilter = "all";
+
+      const detectGrid = document.getElementById("detectGrid");
+      const trapsGrid = document.getElementById("trapsGrid");
+      const snooperLog = document.getElementById("snooperLog");
+      const emptyLog = document.getElementById("emptyLog");
+      const totalLeaksEl = document.getElementById("totalLeaks");
+      const iframeHost = document.getElementById("iframeHost");
+      const filterPills = Array.from(document.querySelectorAll(".filter-pill"));
+
+      function renderTraps() {
+        trapsGrid.textContent = "";
+        let total = 0;
+        for (const t of TRAPS) {
+          const count = trapCounts[t.id] || 0;
+          total += count;
+          const card = document.createElement("div");
+          card.className = "trap-card" + (count > 0 ? " breached" : "");
+
+          const head = document.createElement("div");
+          head.className = "trap-head";
+
+          const name = document.createElement("span");
+          name.className = "trap-name";
+          name.textContent = t.name;
+
+          const badge = document.createElement("span");
+          badge.className = "trap-count";
+          badge.textContent = String(count);
+
+          head.appendChild(name);
+          head.appendChild(badge);
+
+          const desc = document.createElement("div");
+          desc.className = "trap-desc";
+          desc.textContent = t.desc;
+
+          card.appendChild(head);
+          card.appendChild(desc);
+          trapsGrid.appendChild(card);
+        }
+        totalLeaksEl.textContent = String(total);
+      }
+
+      function renderLog() {
+        const filtered = activeFilter === "all"
+          ? logEntries
+          : logEntries.filter((item) => item.category === activeFilter);
+
+        snooperLog.textContent = "";
+        if (filtered.length === 0) {
+          snooperLog.style.display = "none";
+          emptyLog.style.display = "block";
+          return;
+        }
+        snooperLog.style.display = "flex";
+        emptyLog.style.display = "none";
+
+        for (const item of filtered.slice(0, 80)) {
+          const li = document.createElement("li");
+          const left = document.createElement("span");
+          left.textContent = item.detail;
+          const right = document.createElement("span");
+          right.className = "badge";
+          right.textContent = item.tag + " @ " + item.time;
+          li.appendChild(left);
+          li.appendChild(right);
+          snooperLog.appendChild(li);
+        }
+      }
+
+      function recordLeak(trapId, category, tag, detail) {
+        trapCounts[trapId] = (trapCounts[trapId] || 0) + 1;
+        logEntries.unshift({
+          trapId,
+          category,
+          tag,
+          detail,
+          time: new Date().toLocaleTimeString("uk-UA")
+        });
+        if (logEntries.length > 200) logEntries.length = 200;
+        renderTraps();
+        renderLog();
+      }
+
+      function formatKey(e) {
+        const parts = [];
+        if (e.ctrlKey) parts.push("Ctrl");
+        if (e.altKey) parts.push("Alt");
+        if (e.shiftKey) parts.push("Shift");
+        if (e.metaKey) parts.push("Win");
+        parts.push(e.code || e.key || "Unknown");
+        return parts.join(" + ");
+      }
+
+      const initialScriptSet = new Set(Array.from(document.scripts));
+
+      // --- Module 1: Anti-Extension Detector ---
+      function runDetectors() {
+        const results = [];
+
+        // 1. DOM Integrity Check (check extension scripts, data-* injections, tampered attrs)
+        const allScripts = Array.from(document.scripts);
+        const injectedScripts = allScripts.filter((s) => {
+          const src = s.src || "";
+          const txt = s.textContent || "";
+          if (/^(chrome|moz|safari-web)-extension:\/\//i.test(src)) return true;
+          if (/noctrl/i.test(src) || (/noctrl/i.test(txt) && s.id !== "noctrl-test-script")) return true;
+          return !initialScriptSet.has(s);
+        });
+        const foreignAttrs = [
+          ...document.documentElement.getAttributeNames(),
+          ...document.body.getAttributeNames()
+        ].filter((a) => !["lang", "class", "style"].includes(a));
+        const extMarkers = document.querySelectorAll("[data-noctrl], [data-extension]");
+        const domClean = injectedScripts.length === 0 && foreignAttrs.length === 0 && extMarkers.length === 0;
+        results.push({
+          title: "DOM Integrity",
+          ok: domClean,
+          detail: domClean
+            ? "Скриптів: " + allScripts.length + ", ін'єкцій розширень: 0, підозрілих атрибутів: 0."
+            : "Виявлено ін'єкції розширення: скриптів=" + injectedScripts.length + ", атрибути=" + foreignAttrs.join(",")
+        });
+
+        // 2. Global window pollution
+        const leakedKeys = Object.keys(window).filter((k) => /noctrl/i.test(k));
+        const globalClean =
+          window.__noctrlLoaded === undefined &&
+          window.__noctrlSettings === undefined &&
+          leakedKeys.length === 0;
+        results.push({
+          title: "Window Isolation",
+          ok: globalClean,
+          detail: globalClean
+            ? "Глобальний об'єкт window чистий (ISOLATED world не протікає)."
+            : "Виявлено змінні в MAIN world: " + leakedKeys.join(", ")
+        });
+
+        // 3. Native prototype integrity
+        const nativeChecks = [
+          ["EventTarget.addEventListener", EventTarget.prototype.addEventListener],
+          ["Window.addEventListener", Window.prototype.addEventListener],
+          ["Document.addEventListener", Document.prototype.addEventListener],
+          ["Event.stopImmediatePropagation", Event.prototype.stopImmediatePropagation]
+        ];
+        const tampered = nativeChecks
+          .filter(([, fn]) => !Function.prototype.toString.call(fn).includes("[native code]"))
+          .map(([name]) => name);
+        results.push({
+          title: "Prototype Integrity",
+          ok: tampered.length === 0,
+          detail: tampered.length === 0
+            ? "Усі методи EventTarget / Event мають [native code]."
+            : "Підмінені прототипи: " + tampered.join(", ")
+        });
+
+        // 4. Synthetic dispatchEvent Trap (isTrusted === false)
+        let probesReached = 0;
+        const probeSpecs = [
+          {
+            target: window,
+            event: new KeyboardEvent("keydown", { key: "c", code: "KeyC", ctrlKey: true, bubbles: true, cancelable: true })
+          },
+          {
+            target: document,
+            event: typeof ClipboardEvent === "function"
+              ? new ClipboardEvent("copy", { bubbles: true, cancelable: true })
+              : new Event("copy", { bubbles: true, cancelable: true })
+          },
+          {
+            target: document,
+            event: new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 })
+          },
+          {
+            target: document.getElementById("testInput"),
+            event: typeof InputEvent === "function"
+              ? new InputEvent("beforeinput", { inputType: "insertFromPaste", bubbles: true, cancelable: true })
+              : new Event("beforeinput", { bubbles: true, cancelable: true })
+          }
+        ];
+
+        for (const spec of probeSpecs) {
+          let seen = false;
+          const handler = (e) => {
+            if (!e.isTrusted) seen = true;
+          };
+          spec.target.addEventListener(spec.event.type, handler, false);
+          spec.target.dispatchEvent(spec.event);
+          spec.target.removeEventListener(spec.event.type, handler, false);
+          if (seen) probesReached += 1;
+        }
+
+        results.push({
+          title: "Synthetic Event Probe",
+          ok: probesReached === probeSpecs.length,
+          detail: probesReached === probeSpecs.length
+            ? "Усі 4 синтетичні проби (isTrusted: false) пройшли непоміченими."
+            : "Викрито перехоплювач! Проби дійшли: " + probesReached + " з " + probeSpecs.length
+        });
+
+        detectGrid.textContent = "";
+        for (const r of results) {
+          const card = document.createElement("div");
+          card.className = "detect-card";
+
+          const top = document.createElement("div");
+          top.className = "detect-top";
+
+          const title = document.createElement("span");
+          title.className = "detect-title";
+          title.textContent = r.title;
+
+          const pill = document.createElement("span");
+          pill.className = "pill " + (r.ok ? "pill-ok" : "pill-bad");
+          pill.textContent = r.ok ? "Stealth OK" : "Виявлено";
+
+          top.appendChild(title);
+          top.appendChild(pill);
+
+          const detail = document.createElement("div");
+          detail.className = "detect-detail";
+          detail.textContent = r.detail;
+
+          card.appendChild(top);
+          card.appendChild(detail);
+          detectGrid.appendChild(card);
+        }
+      }
+
+      // --- Module 2: 8 Snooping Traps ---
+      // Trap 1: keydown, keypress, keyup
+      ["keydown", "keypress", "keyup"].forEach((evt) => {
+        window.addEventListener(evt, (e) => {
+          if (!e.isTrusted) return;
+          recordLeak("keys", "keys", evt, "Клавіша: " + formatKey(e));
+        }, true);
+      });
+
+      // Trap 2: copy, cut, paste + preventDefault
+      ["copy", "cut", "paste"].forEach((evt) => {
+        document.addEventListener(evt, (e) => {
+          if (!e.isTrusted) return;
+          e.preventDefault();
+          recordLeak("clipboard", "clipboard", evt, "Сайт перехопив і заблокував " + evt.toUpperCase());
+        }, true);
+      });
+
+      // Trap 3: beforeinput & input
+      ["beforeinput", "input"].forEach((evt) => {
+        document.addEventListener(evt, (e) => {
+          if (!e.isTrusted) return;
+          const type = e.inputType || "";
+          if (
+            type === "insertFromPaste" ||
+            type === "insertFromPasteAsQuotation" ||
+            type === "deleteByCut" ||
+            type === "historyUndo" ||
+            type === "historyRedo"
+          ) {
+            if (evt === "beforeinput") e.preventDefault();
+            recordLeak("beforeinput", "clipboard", evt, "Виявлено inputType: " + type);
+          }
+        }, true);
+      });
+
+      // Trap 4: selectstart blocker
+      document.addEventListener("selectstart", (e) => {
+        if (!e.isTrusted) return;
+        e.preventDefault();
+        recordLeak("selectstart", "selection", "selectstart", "Сайт заблокував виділення тексту");
+      }, true);
+
+      // Trap 5: contextmenu + right-click mouse events
+      document.addEventListener("contextmenu", (e) => {
+        if (!e.isTrusted) return;
+        e.preventDefault();
+        recordLeak("rmb", "selection", "contextmenu", "Сайт заблокував ПКМ");
+      }, true);
+
+      ["mousedown", "mouseup", "auxclick"].forEach((evt) => {
+        window.addEventListener(evt, (e) => {
+          if (!e.isTrusted || e.button !== 2) return;
+          recordLeak("rmb", "selection", evt, "Виявлено праву кнопку миші (button=2)");
+        }, true);
+      });
+
+      // Trap 6: selectionchange
+      document.addEventListener("selectionchange", (e) => {
+        if (!e.isTrusted) return;
+        const selectedLen = (window.getSelection()?.toString() || "").length;
+        recordLeak("selectionchange", "selection", "selectionchange", "Зміна виділення (символів: " + selectedLen + ")");
+      }, true);
+
+      // Trap 7: focus & visibility (both leaving and returning to focus)
+      window.addEventListener("blur", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "blur", "Втрата фокусу вікна");
+      }, true);
+
+      document.addEventListener("focusout", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "focusout", "Втрата фокусу елемента");
+      }, true);
+
+      window.addEventListener("focus", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "focus", "Фокус повернувся у вікно браузера");
+      }, true);
+
+      document.addEventListener("focusin", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "focusin", "Фокус перейшов на елемент (focusin)");
+      }, true);
+
+      document.addEventListener("visibilitychange", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "visibilitychange", "Зміна видимості: " + document.visibilityState);
+      }, true);
+
+      document.addEventListener("mouseleave", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "mouseleave", "Курсор залишив межі сторінки");
+      }, true);
+
+      document.addEventListener("mouseenter", (e) => {
+        if (!e.isTrusted) return;
+        recordLeak("focus", "focus", "mouseenter", "Курсор повернувся на сторінку");
+      }, true);
+
+      // Trap 8: Embedded srcdoc iframe
+      const IFRAME_SRCDOC = [
+        "<!DOCTYPE html><html lang='uk'><head><meta charset='UTF-8'><style>",
+        "body{margin:0;padding:10px;background:#0b1120;color:#e2e8f0;font-family:sans-serif;font-size:13px;}",
+        "textarea{width:100%;height:74px;padding:8px;border-radius:6px;border:1px solid #334155;background:#111827;color:#f8fafc;resize:none;box-sizing:border-box;}",
+        ".info{margin-bottom:6px;color:#94a3b8;font-size:12px;}",
+        "</style></head><body>",
+        "<div class='info'>Поле всередині <code>&lt;iframe srcdoc&gt;</code> (натисніть Ctrl+C, Ctrl+V, Ctrl+Enter, ПКМ):</div>",
+        "<textarea>Тестовий текст усередині вкладеного srcdoc iframe.</textarea>",
+        "<script>",
+        "function report(tag, detail){window.parent.postMessage({source:'noctrl-iframe-trap',tag:tag,detail:detail},'*');}",
+        "['keydown','keyup'].forEach(function(ev){window.addEventListener(ev,function(e){if(!e.isTrusted)return;report(ev,'[iframe] Клавіша: '+(e.ctrlKey?'Ctrl + ':'')+(e.code||e.key));},true);});",
+        "['copy','cut','paste','contextmenu','selectstart'].forEach(function(ev){document.addEventListener(ev,function(e){if(!e.isTrusted)return;e.preventDefault();report(ev,'[iframe] Перехоплено '+ev);},true);});",
+        "['beforeinput','input'].forEach(function(ev){document.addEventListener(ev,function(e){if(!e.isTrusted)return;if(e.inputType==='insertFromPaste'||e.inputType==='deleteByCut'){report(ev,'[iframe] '+e.inputType);}},true);});",
+        "<\/script></body></html>"
+      ].join("");
+
+      function spawnTrapIframe() {
+        iframeHost.textContent = "";
+        const iframe = document.createElement("iframe");
+        iframe.title = "Вбудований тестовий iframe";
+        iframe.srcdoc = IFRAME_SRCDOC;
+        iframeHost.appendChild(iframe);
+      }
+
+      window.addEventListener("message", (e) => {
+        if (e.data && e.data.source === "noctrl-iframe-trap") {
+          recordLeak("iframe", "iframe", e.data.tag, e.data.detail);
+        }
+      });
+
+      // UI controls
+      document.getElementById("runDetectBtn").addEventListener("click", runDetectors);
+      document.getElementById("respawnIframeBtn").addEventListener("click", spawnTrapIframe);
+
+      document.getElementById("clearLogBtn").addEventListener("click", () => {
+        logEntries.length = 0;
+        for (const key of Object.keys(trapCounts)) trapCounts[key] = 0;
+        renderTraps();
+        renderLog();
+      });
+
+      document.getElementById("resetAllBtn").addEventListener("click", () => {
+        logEntries.length = 0;
+        for (const key of Object.keys(trapCounts)) trapCounts[key] = 0;
+        renderTraps();
+        renderLog();
+        runDetectors();
+        spawnTrapIframe();
+      });
+
+      for (const pill of filterPills) {
+        pill.addEventListener("click", () => {
+          activeFilter = pill.dataset.filter || "all";
+          for (const p of filterPills) p.classList.toggle("active", p === pill);
+          renderLog();
+        });
+      }
+
+      spawnTrapIframe();
+      renderTraps();
+      renderLog();
+      runDetectors();
+    })();
+  </script>
+</body>
+</html>
