@@ -70,6 +70,8 @@
     siteHost: document.getElementById("siteHost"),
     siteToggleBtn: document.getElementById("siteToggleBtn"),
     fileNotice: document.getElementById("fileNotice"),
+    popoutBtn: document.getElementById("popoutBtn"),
+    recorderTrap: document.getElementById("recorderTrap"),
     recorderBtn: document.getElementById("recorderBtn"),
     cancelRecordBtn: document.getElementById("cancelRecordBtn"),
     addShortcutBtn: document.getElementById("addShortcutBtn"),
@@ -99,7 +101,37 @@
   let isRecording = false;
   let pendingShortcut = null;
   let recordedMods = { ctrl: false, alt: false, shift: false, meta: false };
+  let modifierFinalizeTimer = null;
   let statsTimer = null;
+
+  function clearModifierFinalizeTimer() {
+    if (modifierFinalizeTimer) {
+      clearTimeout(modifierFinalizeTimer);
+      modifierFinalizeTimer = null;
+    }
+  }
+
+  function normalizeEventCode(e) {
+    if (e.code) return e.code;
+    if (
+      e.key === "Enter" ||
+      e.key === "\n" ||
+      e.key === "\r" ||
+      e.keyCode === 13 ||
+      e.keyCode === 10 ||
+      e.charCode === 10 ||
+      e.which === 13 ||
+      e.which === 10
+    ) {
+      return "Enter";
+    }
+    if (typeof e.key === "string" && e.key.length === 1) {
+      const ch = e.key.toUpperCase();
+      if (ch >= "A" && ch <= "Z") return "Key" + ch;
+      if (ch >= "0" && ch <= "9") return "Digit" + ch;
+    }
+    return "";
+  }
 
   function populateManualKeySelect() {
     const groups = [
@@ -287,6 +319,7 @@
   }
 
   function enterRecordingMode() {
+    clearModifierFinalizeTimer();
     isRecording = true;
     pendingShortcut = null;
     recordedMods = { ctrl: false, alt: false, shift: false, meta: false };
@@ -295,17 +328,29 @@
     els.recorderBtn.className = "recorder-btn recording";
     els.recorderBtn.textContent = "Натисніть комбінацію клавіш...";
     els.cancelRecordBtn.classList.remove("hidden");
-    setHint("Натисніть модифікатор (напр. Ctrl) або комбінацію (напр. Ctrl+M)...");
-    if (document.activeElement && document.activeElement !== els.recorderBtn && typeof document.activeElement.blur === "function") {
-      document.activeElement.blur();
+    setHint("Натисніть модифікатор (напр. Ctrl) або комбінацію (напр. Ctrl+Enter)...");
+    if (els.recorderTrap) {
+      els.recorderTrap.value = "";
+      els.recorderTrap.focus();
+    } else {
+      if (document.activeElement && document.activeElement !== els.recorderBtn && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+      els.recorderBtn.focus();
     }
-    els.recorderBtn.focus();
   }
 
   function exitRecordingMode(resetText = true) {
+    clearModifierFinalizeTimer();
     isRecording = false;
     els.cancelRecordBtn.classList.add("hidden");
     els.recorderBtn.classList.remove("recording");
+    if (els.recorderTrap) {
+      els.recorderTrap.value = "";
+      if (document.activeElement === els.recorderTrap && typeof els.recorderTrap.blur === "function") {
+        els.recorderTrap.blur();
+      }
+    }
     if (resetText && !pendingShortcut) {
       els.recorderBtn.className = "recorder-btn";
       els.recorderBtn.textContent = "Натисніть, щоб записати...";
@@ -528,9 +573,25 @@
   }
 
   async function init() {
+    let currentSelfTab = null;
+    if (chrome.tabs?.getCurrent) {
+      try {
+        currentSelfTab = await chrome.tabs.getCurrent();
+      } catch {
+        currentSelfTab = null;
+      }
+    }
+
+    if (currentSelfTab) {
+      document.body.classList.add("is-tab");
+      if (els.popoutBtn) els.popoutBtn.classList.add("hidden");
+    }
+
     const [stored, tabs] = await Promise.all([
       chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS)),
-      chrome.tabs.query({ active: true, currentWindow: true })
+      currentSelfTab
+        ? chrome.tabs.query({ currentWindow: true })
+        : chrome.tabs.query({ active: true, currentWindow: true })
     ]);
 
     settings = {
@@ -542,12 +603,17 @@
       shortcuts: Array.isArray(stored.shortcuts) ? stored.shortcuts : structuredClone(DEFAULT_SETTINGS.shortcuts)
     };
 
-    const activeTab = tabs[0];
-    if (activeTab) {
-      currentTabId = activeTab.id;
-      if (activeTab.url) {
+    const targetTab = currentSelfTab
+      ? tabs
+          .filter((t) => t.id !== currentSelfTab.id && !t.url?.startsWith("chrome-extension://"))
+          .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0] || tabs[0]
+      : tabs[0];
+
+    if (targetTab) {
+      currentTabId = targetTab.id;
+      if (targetTab.url) {
         try {
-          const parsed = new URL(activeTab.url);
+          const parsed = new URL(targetTab.url);
           currentProtocol = parsed.protocol;
           currentHost = parsed.hostname;
         } catch {
@@ -568,6 +634,21 @@
   }
 
   let lastRecordedAt = 0;
+
+  function finalizeCapturedKey(rawCode, key, mods) {
+    clearModifierFinalizeTimer();
+    const candidate = buildShortcut({ ...mods, code: rawCode, key });
+    lastRecordedAt = Date.now();
+    exitRecordingMode(false);
+    applyCandidateShortcut(candidate, { keepRecording: false });
+  }
+
+  if (els.popoutBtn) {
+    els.popoutBtn.addEventListener("click", async () => {
+      await chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
+      window.close();
+    });
+  }
 
   els.globalToggle.addEventListener("change", async () => {
     await saveSettings({ enabled: els.globalToggle.checked });
@@ -627,11 +708,12 @@
     "keydown",
     (e) => {
       if (!isRecording) return;
+      clearModifierFinalizeTimer();
       e.preventDefault();
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 
-      const rawCode = e.code || (e.key === "Enter" ? "Enter" : "");
+      const rawCode = normalizeEventCode(e);
 
       recordedMods = {
         ctrl: Boolean(e.ctrlKey) || rawCode === "ControlLeft" || rawCode === "ControlRight",
@@ -646,13 +728,64 @@
         return;
       }
 
-      const candidate = buildShortcut({ ...recordedMods, code: rawCode, key: e.key });
-      lastRecordedAt = Date.now();
-      exitRecordingMode(false);
-      applyCandidateShortcut(candidate, { keepRecording: false });
+      if (rawCode || (e.key && e.key !== "Process" && e.key !== "Unidentified")) {
+        finalizeCapturedKey(rawCode, e.key, recordedMods);
+      }
     },
     true
   );
+
+  window.addEventListener(
+    "keypress",
+    (e) => {
+      if (!isRecording) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+      const rawCode = normalizeEventCode(e);
+      if (!rawCode || MODIFIER_CODES.has(rawCode)) return;
+
+      const mods = {
+        ctrl: Boolean(e.ctrlKey) || recordedMods.ctrl,
+        alt: Boolean(e.altKey) || recordedMods.alt,
+        shift: Boolean(e.shiftKey) || recordedMods.shift,
+        meta: Boolean(e.metaKey) || recordedMods.meta
+      };
+      finalizeCapturedKey(rawCode, e.key, mods);
+    },
+    true
+  );
+
+  if (els.recorderTrap) {
+    els.recorderTrap.addEventListener("beforeinput", (e) => {
+      if (!isRecording) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const inputType = String(e.inputType || "");
+      if (inputType === "insertLineBreak" || inputType === "insertParagraph") {
+        finalizeCapturedKey("Enter", "Enter", recordedMods);
+        return;
+      }
+      if (inputType === "insertText" && typeof e.data === "string" && e.data.length === 1) {
+        const code = normalizeEventCode({ code: "", key: e.data });
+        if (code) finalizeCapturedKey(code, e.data, recordedMods);
+      }
+    });
+
+    els.recorderTrap.addEventListener("input", () => {
+      if (!isRecording) return;
+      const val = els.recorderTrap.value || "";
+      els.recorderTrap.value = "";
+      if (val.includes("\n") || val.includes("\r")) {
+        finalizeCapturedKey("Enter", "Enter", recordedMods);
+      } else if (val.length === 1) {
+        const code = normalizeEventCode({ code: "", key: val });
+        if (code) finalizeCapturedKey(code, val, recordedMods);
+      }
+    });
+  }
 
   window.addEventListener(
     "keyup",
@@ -662,33 +795,37 @@
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 
-      const rawCode = e.code || (e.key === "Enter" ? "Enter" : "");
+      const rawCode = normalizeEventCode(e);
 
-      if (!MODIFIER_CODES.has(rawCode)) {
+      if (rawCode && !MODIFIER_CODES.has(rawCode)) {
         const mods = {
           ctrl: Boolean(e.ctrlKey) || recordedMods.ctrl,
           alt: Boolean(e.altKey) || recordedMods.alt,
           shift: Boolean(e.shiftKey) || recordedMods.shift,
           meta: Boolean(e.metaKey) || recordedMods.meta
         };
-        const fallbackCandidate = buildShortcut({ ...mods, code: rawCode, key: e.key });
-        lastRecordedAt = Date.now();
-        exitRecordingMode(false);
-        applyCandidateShortcut(fallbackCandidate, { keepRecording: false });
+        finalizeCapturedKey(rawCode, e.key, mods);
         return;
       }
 
-      if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && pendingShortcut) {
+      if (MODIFIER_CODES.has(rawCode) && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && pendingShortcut) {
         const finalized = pendingShortcut;
-        lastRecordedAt = Date.now();
-        exitRecordingMode(false);
-        applyCandidateShortcut(finalized, { keepRecording: false });
+        clearModifierFinalizeTimer();
+        modifierFinalizeTimer = setTimeout(() => {
+          modifierFinalizeTimer = null;
+          if (!isRecording) return;
+          lastRecordedAt = Date.now();
+          exitRecordingMode(false);
+          applyCandidateShortcut(finalized, { keepRecording: false });
+        }, 150);
       }
     },
     true
   );
 
   els.addShortcutBtn.addEventListener("click", async () => {
+    clearModifierFinalizeTimer();
+    if (isRecording) exitRecordingMode(false);
     if (!pendingShortcut) return;
     if (settings.shortcuts.some((s) => isSameShortcut(s, pendingShortcut))) {
       setHint(`Комбінація «${pendingShortcut.label}» вже є у списку.`, "error");
@@ -749,6 +886,7 @@
   });
 
   window.addEventListener("unload", () => {
+    clearModifierFinalizeTimer();
     if (statsTimer) clearInterval(statsTimer);
   });
 

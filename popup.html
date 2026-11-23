@@ -20,10 +20,13 @@
         </div>
       </div>
 
-      <label class="switch" title="Увімкнути або вимкнути захист глобально">
-        <input type="checkbox" id="globalToggle" />
-        <span class="slider"></span>
-      </label>
+      <div class="header-actions">
+        <button type="button" id="popoutBtn" class="btn-header-icon" title="Відкрити в окремій вкладці">↗</button>
+        <label class="switch" title="Увімкнути або вимкнути захист глобально">
+          <input type="checkbox" id="globalToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
     </header>
 
     <section class="site-bar" id="siteBar">
@@ -43,6 +46,7 @@
         <h2 class="section-title">Додати комбінацію</h2>
       </div>
       <div class="recorder-row">
+        <textarea id="recorderTrap" class="recorder-trap" tabindex="-1" aria-hidden="true" autocomplete="off" spellcheck="false"></textarea>
         <div id="recorderBtn" class="recorder-btn" tabindex="0" role="button">
           Натисніть, щоб записати...
         </div>

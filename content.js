@@ -192,8 +192,16 @@
         continue;
       }
 
-      if (s.code === "Enter") {
-        if (event.code === "Enter" || event.code === "NumpadEnter" || event.key === "Enter") {
+      if (s.code === "Enter" || s.code === "NumpadEnter") {
+        if (
+          event.code === "Enter" ||
+          event.code === "NumpadEnter" ||
+          event.key === "Enter" ||
+          event.key === "\n" ||
+          event.key === "\r" ||
+          event.keyCode === 13 ||
+          event.keyCode === 10
+        ) {
           return s;
         }
       }
